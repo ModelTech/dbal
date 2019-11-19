@@ -75,6 +75,39 @@ class OCI8StatementTest extends DbalTestCase
     }
 
     /**
+     * Testing binding named and positioned parameters
+     *
+     * @param mixed[] $params
+     *
+     * @dataProvider bindParamsDataProvider
+     */
+    public function testBindParam(array $params, string $query) : void
+    {
+        $conn = $this->createMock(OCI8Connection::class);
+        /** @var OCI8Statement|MockObject $statement */
+        $statement = $this->getMockBuilder(OCI8Statement::class)
+            ->onlyMethods([  'prepareQuery', 'bindParamByName'])
+            // $dbh, string $query, OCI8Connection $conn
+            ->setConstructorArgs([null, $query, $conn])
+            ->getMock();
+
+        $i = 0;
+        foreach ($params as $index => $value) {
+            $statement->expects($this->at($i))
+                ->method('bindParamByName')
+                ->with(
+                    $this->stringStartsWith(':'),
+                    $this->equalTo($value)
+                );
+            $i++;
+        }
+
+        foreach ($params as $index => $value) {
+            $statement->bindParam($index, $value);
+        }
+    }
+
+    /**
      * @return array<int, array<int, mixed>>
      */
     public static function executeDataProvider() : iterable
@@ -87,6 +120,25 @@ class OCI8StatementTest extends DbalTestCase
             // $hasZeroIndex = isset($params[0]); == false
             [
                 [0 => null, 1 => 'test', 2 => 'value'],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, array<int, mixed>|string>
+     */
+    public static function bindParamsDataProvider() : iterable
+    {
+        return [
+            // Positional placeholders
+            [
+                [1 => 'test', 2 => null, 3 => 'value'],
+                'select * from dual where 1 = ? and 2 = ? and 3 = ?',
+            ],
+            // Named placeholders
+            [
+                [':p1' => null, ':p2' => 'test', ':p3' => 'value'],
+                'select * from dual where 1 = :p1 and 2 = :p2 and 3 = :p3',
             ],
         ];
     }
